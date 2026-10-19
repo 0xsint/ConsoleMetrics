@@ -891,7 +891,7 @@ function ConsoleMetrics:AddPCTSetEntry(setName, entry)
         end
     end
 
-    -- Derive scene from procType (synergies/passives â†’ PvE leaning; sets â†’ PvP default).
+    -- Derive scene from procType (synergies/passives -> PvE leaning; sets -> PvP default).
     local scene = "PvP"
     if type(entry.procType) == "string" then
         local pt = string.lower(entry.procType)

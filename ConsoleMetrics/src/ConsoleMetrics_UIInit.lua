@@ -525,7 +525,7 @@ function ConsoleMetrics:HandleSlash(rawInput)
         return
     end
 
-    if input == "share skills" or input == "sharesklls" or input == "topskills" then
+    if input == "share skills" or input == "topskills" then
         self:ShareTopSkillsToChat()
         return
     end
@@ -696,7 +696,7 @@ function ConsoleMetrics:HandleSlash(rawInput)
         self.ioTraceState = nil
         self.observedAbilityLog = {}
         self.observedAbilityCount = 0
-        self.fpsRuntime = { samples = 0, total = 0, min = nil, bins = {} }
+        self.fpsRuntime = { fpsSamples = 0, fpsTotal = 0, fpsMin = nil, fpsBins = {} }
         if self.ui.root then
             self.ui.root:SetHidden(true)
         end
@@ -705,6 +705,18 @@ function ConsoleMetrics:HandleSlash(rawInput)
     end
 
     self:Print("Unknown command. Use /cm help")
+end
+
+-- Live-refresh key: only rebuild the dialog when panel, combat state, snapshot revision, or fight index changes.
+local function BuildLiveDialogRefreshKey(self)
+    local fight = self.fight or {}
+    return string.format(
+        "%s|%d|%d|%d",
+        tostring(self.dialogPanel or "main"),
+        self.inCombat and 1 or 0,
+        math.floor(tonumber(fight.snapshotRev) or 0),
+        self.viewFightIndex or 0
+    )
 end
 
 function ConsoleMetrics:OnUpdate()
@@ -722,29 +734,19 @@ function ConsoleMetrics:OnUpdate()
     if type(getFramerate) == "function" then
         local fps = tonumber(getFramerate())
         if fps and fps > 0 then
-            self.fpsRuntime = self.fpsRuntime or { samples = 0, total = 0, min = nil, bins = {} }
-            self.fpsRuntime.samples = (self.fpsRuntime.samples or 0) + 1
-            self.fpsRuntime.total = (self.fpsRuntime.total or 0) + fps
-            if self.fpsRuntime.min == nil or fps < self.fpsRuntime.min then
-                self.fpsRuntime.min = fps
+            self.fpsRuntime = self.fpsRuntime or { fpsSamples = 0, fpsTotal = 0, fpsMin = nil, fpsBins = {} }
+            local rt = self.fpsRuntime
+            rt.fpsSamples = (rt.fpsSamples or 0) + 1
+            rt.fpsTotal = (rt.fpsTotal or 0) + fps
+            if rt.fpsMin == nil or fps < rt.fpsMin then
+                rt.fpsMin = fps
             end
-            local bins = self.fpsRuntime.bins or {}
-            self.fpsRuntime.bins = bins
+            local bins = rt.fpsBins or {}
+            rt.fpsBins = bins
             local bucket = math.max(0, math.min(120, math.floor(fps + 0.5)))
             local key = bucket + 1
             bins[key] = (bins[key] or 0) + 1
         end
-    end
-
-    local function BuildLiveDialogRefreshKey()
-        local fight = self.fight or {}
-        return string.format(
-            "%s|%d|%d|%d",
-            tostring(self.dialogPanel or "main"),
-            self.inCombat and 1 or 0,
-            math.floor(tonumber(fight.snapshotRev) or 0),
-            self.viewFightIndex or 0
-        )
     end
 
     -- Two-step gamepad cancel behavior:
@@ -794,7 +796,7 @@ function ConsoleMetrics:OnUpdate()
 
     if dialogShowing and self.viewFightIndex == 0 then
         if not self.dialogRefreshAtMs or nowMs >= self.dialogRefreshAtMs then
-            local refreshKey = BuildLiveDialogRefreshKey()
+            local refreshKey = BuildLiveDialogRefreshKey(self)
             if self.ui.fightViewDialog and self.lastDialogRefreshKey ~= refreshKey then
                 self:PopulateFightViewDialog(self.ui.fightViewDialog)
                 self.lastDialogRefreshKey = refreshKey
@@ -1132,7 +1134,7 @@ function ConsoleMetrics:Initialize()
     self.ioTraceState = nil
     self.observedAbilityLog = {}
     self.observedAbilityCount = 0
-    self.fpsRuntime = { samples = 0, total = 0, min = nil, bins = {} }
+    self.fpsRuntime = { fpsSamples = 0, fpsTotal = 0, fpsMin = nil, fpsBins = {} }
 
     if self.saved.uiPanelEnabled then
         self:CreateUI()

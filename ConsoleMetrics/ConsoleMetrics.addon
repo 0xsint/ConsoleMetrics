@@ -1,7 +1,7 @@
 ## Title: Console Metrics
 ## Author: Vixen Hunny
-## Version: 1.0.0
-## APIVersion: 101050
+## Version: 3.0.0
+## APIVersion: 101051
 ## SavedVariables: ConsoleMetricsSavedVars
 ## OptionalDependsOn: PvPCooldownTracker LibConsoleDialogs LibHarvensAddonSettings LibAddonMenu-2.0 LMB
 

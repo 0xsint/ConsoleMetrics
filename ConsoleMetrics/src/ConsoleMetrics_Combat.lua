@@ -922,7 +922,7 @@ function ConsoleMetrics:OnCombatEvent(
     end
     local allowScrollLine = self:ShouldPushCombatScrollLine(nowMs)
 
-    -- Accumulate every unique ability nameâ†’ID pair seen this session for /cm dumpsets discovery.
+    -- Accumulate every unique ability name -> ID pair seen this session for /cm dumpsets discovery.
     local safeIdForLog = SafeAbilityId(abilityId)
     if safeIdForLog > 0 and safeAbilityName ~= "Unknown Skill" and not self.observedAbilityLog[safeIdForLog] then
         local maxObserved = tonumber(OBSERVED_ABILITY_LOG_MAX) or 2048
@@ -1268,6 +1268,31 @@ function ConsoleMetrics:UpdateTopSkills()
     end
 end
 
+-- Metric-cache helpers (module-level so UpdateMetrics does not allocate closures per call).
+local function SetTextIfChanged(metricCache, cacheKey, control, text)
+    if metricCache[cacheKey] ~= text then
+        control:SetText(text)
+        metricCache[cacheKey] = text
+    end
+end
+
+local function SetBarRangeIfChanged(metricCache, cacheKey, bar, minValue, maxValue)
+    local cached = metricCache[cacheKey]
+    if not cached or cached.min ~= minValue or cached.max ~= maxValue then
+        bar:SetMinMax(minValue, maxValue)
+        metricCache[cacheKey] = { min = minValue, max = maxValue }
+    end
+end
+
+local function SetBarValueIfChanged(metricCache, cacheKey, bar, value, epsilon)
+    local cached = metricCache[cacheKey]
+    epsilon = epsilon or 0.1
+    if cached == nil or math.abs(cached - value) >= epsilon then
+        bar:SetValue(value)
+        metricCache[cacheKey] = value
+    end
+end
+
 function ConsoleMetrics:UpdateMetrics()
     if not self.fight then
         return
@@ -1290,54 +1315,30 @@ function ConsoleMetrics:UpdateMetrics()
     local rateMax = math.max(dps, hps, 1)
     local metricCache = self.uiMetricCache or {}
     self.uiMetricCache = metricCache
+    local rows = self.ui.rows
 
-    local function SetTextIfChanged(cacheKey, control, text)
-        if metricCache[cacheKey] ~= text then
-            control:SetText(text)
-            metricCache[cacheKey] = text
-        end
-    end
+    SetTextIfChanged(metricCache, "durationText", self.ui.durationLabel, string.format("Encounter  %.1fs", duration))
 
-    local function SetBarRangeIfChanged(cacheKey, bar, minValue, maxValue)
-        local cached = metricCache[cacheKey]
-        if not cached or cached.min ~= minValue or cached.max ~= maxValue then
-            bar:SetMinMax(minValue, maxValue)
-            metricCache[cacheKey] = { min = minValue, max = maxValue }
-        end
-    end
+    SetTextIfChanged(metricCache, "dpsText",    rows.dps.value,    ShortNumber(dps))
+    SetTextIfChanged(metricCache, "hpsText",    rows.hps.value,    ShortNumber(hps))
+    SetTextIfChanged(metricCache, "damageText", rows.damage.value, NumberText(self.fight.totalDamage))
+    SetTextIfChanged(metricCache, "healText",   rows.heal.value,   NumberText(self.fight.totalHeal))
+    SetTextIfChanged(metricCache, "takenText",  rows.taken.value,  NumberText(self.fight.totalTaken))
+    SetTextIfChanged(metricCache, "critText",   rows.crit.value,   string.format("%.1f%%", critPct))
 
-    local function SetBarValueIfChanged(cacheKey, bar, value, epsilon)
-        local cached = metricCache[cacheKey]
-        epsilon = epsilon or 0.1
-        if cached == nil or math.abs(cached - value) >= epsilon then
-            bar:SetValue(value)
-            metricCache[cacheKey] = value
-        end
-    end
+    SetBarRangeIfChanged(metricCache, "dpsRange",    rows.dps.bar,    0, rateMax)
+    SetBarRangeIfChanged(metricCache, "hpsRange",    rows.hps.bar,    0, rateMax)
+    SetBarRangeIfChanged(metricCache, "damageRange", rows.damage.bar, 0, totalMax)
+    SetBarRangeIfChanged(metricCache, "healRange",   rows.heal.bar,   0, totalMax)
+    SetBarRangeIfChanged(metricCache, "takenRange",  rows.taken.bar,  0, totalMax)
+    SetBarRangeIfChanged(metricCache, "critRange",   rows.crit.bar,   0, 100)
 
-    local durationText = string.format("Encounter  %.1fs", duration)
-    SetTextIfChanged("durationText", self.ui.durationLabel, durationText)
-
-    SetTextIfChanged("dpsText", self.ui.rows.dps.value, ShortNumber(dps))
-    SetTextIfChanged("hpsText", self.ui.rows.hps.value, ShortNumber(hps))
-    SetTextIfChanged("damageText", self.ui.rows.damage.value, NumberText(self.fight.totalDamage))
-    SetTextIfChanged("healText", self.ui.rows.heal.value, NumberText(self.fight.totalHeal))
-    SetTextIfChanged("takenText", self.ui.rows.taken.value, NumberText(self.fight.totalTaken))
-    SetTextIfChanged("critText", self.ui.rows.crit.value, string.format("%.1f%%", critPct))
-
-    SetBarRangeIfChanged("dpsRange", self.ui.rows.dps.bar, 0, rateMax)
-    SetBarRangeIfChanged("hpsRange", self.ui.rows.hps.bar, 0, rateMax)
-    SetBarRangeIfChanged("damageRange", self.ui.rows.damage.bar, 0, totalMax)
-    SetBarRangeIfChanged("healRange", self.ui.rows.heal.bar, 0, totalMax)
-    SetBarRangeIfChanged("takenRange", self.ui.rows.taken.bar, 0, totalMax)
-    SetBarRangeIfChanged("critRange", self.ui.rows.crit.bar, 0, 100)
-
-    SetBarValueIfChanged("dpsValue", self.ui.rows.dps.bar, dps, 0.05)
-    SetBarValueIfChanged("hpsValue", self.ui.rows.hps.bar, hps, 0.05)
-    SetBarValueIfChanged("damageValue", self.ui.rows.damage.bar, self.fight.totalDamage, 1)
-    SetBarValueIfChanged("healValue", self.ui.rows.heal.bar, self.fight.totalHeal, 1)
-    SetBarValueIfChanged("takenValue", self.ui.rows.taken.bar, self.fight.totalTaken, 1)
-    SetBarValueIfChanged("critValue", self.ui.rows.crit.bar, critPct, 0.05)
+    SetBarValueIfChanged(metricCache, "dpsValue",    rows.dps.bar,    dps, 0.05)
+    SetBarValueIfChanged(metricCache, "hpsValue",    rows.hps.bar,    hps, 0.05)
+    SetBarValueIfChanged(metricCache, "damageValue", rows.damage.bar, self.fight.totalDamage, 1)
+    SetBarValueIfChanged(metricCache, "healValue",   rows.heal.bar,   self.fight.totalHeal, 1)
+    SetBarValueIfChanged(metricCache, "takenValue",  rows.taken.bar,  self.fight.totalTaken, 1)
+    SetBarValueIfChanged(metricCache, "critValue",   rows.crit.bar,   critPct, 0.05)
 
     self:UpdateTopSkills()
     self:UpdateTopHealing()

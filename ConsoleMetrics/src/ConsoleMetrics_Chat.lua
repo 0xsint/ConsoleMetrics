@@ -106,17 +106,6 @@ end
 -- Low-level send
 ---------------------------------------------------------------------------
 
-function ConsoleMetrics:SendToChat(text)
-    if type(text) ~= "string" or text == "" then return end
-    if #text > 380 then text = string.sub(text, 1, 377) .. "..." end
-    if type(CHAT_SYSTEM) == "table" and type(CHAT_SYSTEM.StartTextEntry) == "function" then
-        CHAT_SYSTEM:StartTextEntry(text)
-        self:Print("Chat pre-filled - choose a channel and press Confirm.")
-    else
-        self:Print("[Share] " .. text)
-    end
-end
-
 -- Sends chunk[1] via the keyboard; remaining chunks are printed to own chat.
 function ConsoleMetrics:SendChunks(chunks)
     if not chunks or #chunks == 0 then return end
@@ -195,115 +184,6 @@ function ConsoleMetrics:ShareAllGearLinksToChat()
 end
 
 ---------------------------------------------------------------------------
--- Fight summary (text stats — always fits in one message)
----------------------------------------------------------------------------
-
-function ConsoleMetrics:BuildFightShareLine(snapshot, label)
-    snapshot = snapshot or {}
-    return string.format("[%s] %s | DPS %s | HPS %s | Dmg %s | Heal %s | Taken %s | Crit %s",
-        label or "CM",
-        string.format("%.1fs", tonumber(snapshot.duration) or 0),
-        ShortNumber(tonumber(snapshot.dps)         or 0),
-        ShortNumber(tonumber(snapshot.hps)         or 0),
-        ShortNumber(tonumber(snapshot.totalDamage) or 0),
-        ShortNumber(tonumber(snapshot.totalHeal)   or 0),
-        ShortNumber(tonumber(snapshot.totalTaken)  or 0),
-        string.format("%.1f%%", tonumber(snapshot.critPct) or 0))
-end
-
-function ConsoleMetrics:ShareFightToChat(customLabel)
-    local snapshot, isLive = self:GetViewedFightSnapshot()
-    local label = customLabel
-        or (isLive and "Live" or ("Fight " .. tostring(self.viewFightIndex or 0)))
-    self:SendToChat(self:BuildFightShareLine(snapshot, label))
-end
-
----------------------------------------------------------------------------
--- Top damage skills — ability links with damage totals
----------------------------------------------------------------------------
-
-function ConsoleMetrics:ShareTopSkillsToChat()
-    local snapshot  = self:GetViewedFightSnapshot()
-    local skillList = (snapshot or {}).skillList or {}
-    local links = {}
-    for i = 1, math.min(5, #skillList) do
-        local s = skillList[i]
-        if s then
-            links[#links + 1] = GetAbilityLinkSafe(s.abilityId, s.name)
-                .. ":" .. ShortNumber(s.damage or 0)
-        end
-    end
-    if #links == 0 then self:SendToChat("[CM Top Skills]: no data yet") ; return end
-    self:SendChunks(PackLinksIntoChunks(links, "[CM Top Skills]"))
-end
-
----------------------------------------------------------------------------
--- Resource / sustain
----------------------------------------------------------------------------
-
-function ConsoleMetrics:BuildResourceShareLine(snapshot)
-    snapshot = snapshot or {}
-    local res = snapshot.resourceSummary or {}
-    local function Pct(t)
-        return t.hasData and string.format("%.0f%%", tonumber(t.averagePct) or 0) or "n/a"
-    end
-    return string.format("[CM Sustain] HP:%s | Mag:%s | Stam:%s | Samples:%d",
-        Pct(res.health  or {}), Pct(res.magicka or {}), Pct(res.stamina or {}),
-        tonumber(res.sampleCount) or 0)
-end
-
-function ConsoleMetrics:ShareResourceToChat()
-    self:SendToChat(self:BuildResourceShareLine(self:GetViewedFightSnapshot()))
-end
-
----------------------------------------------------------------------------
--- Build summary — text header + linked bars
----------------------------------------------------------------------------
-
-function ConsoleMetrics:BuildShareLinePlain()
-    local fCat = type(HOTBAR_CATEGORY_PRIMARY) == "number" and HOTBAR_CATEGORY_PRIMARY or nil
-    local bCat = type(HOTBAR_CATEGORY_BACKUP)  == "number" and HOTBAR_CATEGORY_BACKUP  or nil
-    local fBar = BuildActionBarSnapshot(fCat)
-    local bBar = BuildActionBarSnapshot(bCat)
-    local sets = BuildEquippedSetSummary()
-    local boons = BuildActiveBoonSnapshot()
-    local champ = BuildChampionSnapshot()
-    local function Short(n, m) m=m or 13
-        if type(n)~="string" or n=="" then return "?" end
-        return #n<=m and n or (string.match(n,"^(%S+)") or string.sub(n,1,m))
-    end
-    local function BarStr(bar)
-        local p={}
-        for i=1,#bar do local n=bar[i] and bar[i].abilityName
-            if n and n~="Empty" and n~="" then p[#p+1]=Short(n,12) end end
-        return #p>0 and table.concat(p,"/") or "-"
-    end
-    local sl={}
-    for i=1,#sets do local s=sets[i]
-        if s and s.setName~="" then sl[#sl+1]=Short(s.setName,16).."("..tostring(s.numEquipped or 0)..")" end
-    end
-    return string.format("[CM Build] CP:%s | Sets:%s | Boon:%s | F[%s] B[%s]",
-        champ.totalPoints and NumberText(champ.totalPoints) or "?",
-        #sl>0 and table.concat(sl," ") or "-",
-        (#boons>0 and boons[1]) and Short(boons[1],18) or "-",
-        BarStr(fBar), BarStr(bBar))
-end
-
--- Sends plain-text header to chat, prints linked bars to own chat log.
-function ConsoleMetrics:ShareBuildToChat()
-    self:SendToChat(self:BuildShareLinePlain())
-    local fCat = type(HOTBAR_CATEGORY_PRIMARY) == "number" and HOTBAR_CATEGORY_PRIMARY or nil
-    local bCat = type(HOTBAR_CATEGORY_BACKUP)  == "number" and HOTBAR_CATEGORY_BACKUP  or nil
-    for _, c in ipairs(self:BuildBarLinkChunks(fCat, "Front Bar")) do self:Print(c) end
-    for _, c in ipairs(self:BuildBarLinkChunks(bCat, "Back Bar"))  do self:Print(c) end
-    self:Print("Use Share Front/Back Bar buttons to send each bar with links.")
-end
-
--- Backwards-compat aliases
-function ConsoleMetrics:LinkBuildToChat() self:ShareBuildToChat() end
-function ConsoleMetrics:BuildShareLine()  return self:BuildShareLinePlain() end
-
----------------------------------------------------------------------------
 -- CP Slottables — shared link-list builder (used by both share functions)
 ---------------------------------------------------------------------------
 
@@ -368,11 +248,12 @@ function ConsoleMetrics:ShareFullBuildLinked()
     local fCat = type(HOTBAR_CATEGORY_PRIMARY) == "number" and HOTBAR_CATEGORY_PRIMARY or nil
     local bCat = type(HOTBAR_CATEGORY_BACKUP)  == "number" and HOTBAR_CATEGORY_BACKUP  or nil
 
-    -- Build each section as a labelled group, then join with " | " separators.
-    local sections = {}
+    -- Chunk each section separately so no |H...|h link token is ever cut mid-string.
+    local chunks = {}
     local function AddSection(label, links)
-        if #links > 0 then
-            sections[#sections + 1] = ">> " .. label .. ": " .. table.concat(links, " ")
+        if #links == 0 then return end
+        for _, chunk in ipairs(PackLinksIntoChunks(links, "[CM " .. label .. "]")) do
+            chunks[#chunks + 1] = chunk
         end
     end
 
@@ -383,30 +264,13 @@ function ConsoleMetrics:ShareFullBuildLinked()
     AddSection("Weapons",   BuildGearLinksRaw(WEAPON_SLOTS))
     AddSection("CP",        BuildCPSlottableLinkList())
 
-    if #sections == 0 then
+    if #chunks == 0 then
         self:Print("No build data found to share.")
         return
     end
 
-    local line = table.concat(sections, "  |  ")
-    if type(CHAT_SYSTEM) == "table" and type(CHAT_SYSTEM.StartTextEntry) == "function" then
-        CHAT_SYSTEM:StartTextEntry(line)
-        self:Print("Build links pre-filled — choose a channel and press Confirm.")
-        ConsoleMetrics:SendToChat(line)  -- also send to chat so the player sees it in their own log
-    else
-        self:Print("[CM Build] " .. line)
-        self:SendToChat(line)
-    end
-end
-
----------------------------------------------------------------------------
--- Full snapshot (fight + build in one line)
----------------------------------------------------------------------------
-
-function ConsoleMetrics:ShareFullSnapshotToChat()
-    local snap, isLive = self:GetViewedFightSnapshot()
-    local label = isLive and "Live" or ("Fight "..tostring(self.viewFightIndex or 0))
-    self:SendToChat(self:BuildFightShareLine(snap, label) .. " || " .. self:BuildShareLinePlain())
+    -- First chunk is pre-filled in the chat entry; the rest are printed to the local log.
+    self:SendChunks(chunks)
 end
 
 ---------------------------------------------------------------------------
@@ -584,11 +448,6 @@ end
 function ConsoleMetrics:ShareBuildToChat()
     local line = self:BuildShareLine()
     self:SendToChat(line)
-end
-
--- Kept for slash-command compatibility
-function ConsoleMetrics:LinkBuildToChat()
-    self:ShareBuildToChat()
 end
 
 ---------------------------------------------------------------------------

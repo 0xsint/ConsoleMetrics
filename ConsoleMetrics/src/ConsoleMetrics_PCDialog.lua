@@ -805,7 +805,7 @@ local function RenderBuffs(content, self)
         for i = 1, math.min(limit, #buffs) do
             local e = buffs[i]
             if e then
-                local durS = (e.totalDurationMs or 0) / 1000
+                local durS = (e.uptimeMs or 0) / 1000
                 AddStat(content, e.name or "?",
                     string.format("%.1f%%  (%.1fs up)", e.uptimePct or 0, durS),
                     string.format("Uptime: %.1f%%  |  Active: %.1fs  |  Gained: %d×  |  Faded: %d×",
@@ -822,9 +822,9 @@ local function RenderBuffs(content, self)
             local e = sets[i]
             if e then
                 AddStat(content, e.name or "?",
-                    string.format("%.1f%%  (%d procs)", e.uptimePct or 0, e.procCount or 0),
+                    string.format("%.1f%%  (%d procs)", e.uptimePct or 0, e.procs or 0),
                     string.format("Set proc uptime: %.1f%%  |  Procs: %d  |  Total proc value: %s",
-                        e.uptimePct or 0, e.procCount or 0, NumberText(e.totalValue or 0)))
+                        e.uptimePct or 0, e.procs or 0, NumberText(e.totalValue or 0)))
             end
         end
     end
@@ -851,7 +851,7 @@ local function RenderDebuffs(content, self)
                 AddStat(content, e.name or "?",
                     string.format("%.1f%%  (%.1fs up  |  %d apps)",
                         e.uptimePct or 0,
-                        (e.totalDurationMs or 0) / 1000,
+                        (e.uptimeMs or 0) / 1000,
                         e.activations or 0))
             end
         end
@@ -878,7 +878,7 @@ local function RenderMitigation(content, self)
         local m = moments[i]
         if m then
             AddStat(content, m.abilityName or "?",
-                string.format("%s  at %s", NumberText(m.value or 0), m.timestamp or "?"),
+                NumberText(m.value or 0),
                 m.tooltip or string.format("Mitigated %s via %s", NumberText(m.value or 0), m.abilityName or "?"))
         end
     end
@@ -890,14 +890,16 @@ end
 -- Resistance panel
 -------------------------------------------------------------------------------
 local function RenderResistance(content, self)
-    local snap = self:GetViewedFightSnapshot() or {}
+    local snap, isLive = self:GetViewedFightSnapshot()
+    snap = snap or {}
     pcDlg.breadcrumb:SetText("Resistance / DR")
-    local prot = snap.protectionSummary or {}
+    -- Predicted values come from the behavior model; protectionSummary only holds uptime splits.
+    local bm = self:GetBehaviorModel(isLive and snap or nil) or {}
     AddSection(content, "Resistance & Damage Reduction")
-    AddStat(content, "Inferred Resistance",  NumberText(prot.predictedResistance or 0))
-    AddStat(content, "Inferred DR %",        string.format("%.1f%%", prot.predictedDrPct or 0))
-    AddStat(content, "Protection Profile",   prot.pressureProfile or "n/a")
-    AddStat(content, "Samples",              tostring(prot.resistanceSamples or 0))
+    AddStat(content, "Inferred Resistance",  NumberText(bm.predictedResistance or 0))
+    AddStat(content, "Inferred DR %",        string.format("%.1f%%", bm.predictedDrPct or 0))
+    AddStat(content, "Protection Profile",   bm.pressureProfile or "n/a")
+    AddStat(content, "Samples",              tostring(bm.samples or 0))
     local targets = snap.targetList or {}
     if #targets > 0 then
         AddSection(content, "Per-Target Estimates")

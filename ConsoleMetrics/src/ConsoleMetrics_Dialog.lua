@@ -69,6 +69,41 @@
         })
     end
 
+    local function AddFightNavButtons()
+        AddActionButton("Previous Fight", "Cycle to previous fight in history", function()
+            self:StepFightView(-1)
+        end, function()
+            return #self.fightHistory == 0
+        end)
+        AddActionButton("Next Fight", "Cycle to next fight in history", function()
+            self:StepFightView(1)
+        end, function()
+            return #self.fightHistory == 0
+        end)
+        AddActionButton("View Live Fight", "Return to current live fight view", function()
+            self.viewFightIndex = 0
+        end)
+    end
+
+    local function AddMomentSection(label, moments, maxCount, emptyText, emptyTooltip)
+        dialog:AddSetting({ type = LibHarvensAddonSettings.ST_SECTION, label = label })
+        if not moments or #moments == 0 then
+            AddScrollableStatLine(emptyText, emptyTooltip)
+            return
+        end
+        for i = 1, math.min(maxCount, #moments) do
+            local moment = moments[i]
+            AddScrollableStatLine(string.format("%d) %s", i, moment.label), moment.tooltip)
+        end
+    end
+
+    local function AddHealingAndMitigationMoments(snapshot, mitigationEmptyTooltip)
+        AddMomentSection("Top Healing Moments (30)", snapshot.topHealingMoments, 30,
+            "No healing moments yet.", "No healing events in this fight")
+        AddMomentSection("Top Mitigation Moments (30)", snapshot.topMitigationMoments, 30,
+            "No mitigation moments yet.", mitigationEmptyTooltip)
+    end
+
     local function FormatMs(ms)
         return string.format("%.1fs", (ms or 0) / 1000)
     end
@@ -84,33 +119,14 @@
         end
 
         local stats = self.fpsRuntime
-        if type(stats) ~= "table" or (stats.samples or 0) <= 0 then
+        if type(stats) ~= "table" or (stats.fpsSamples or 0) <= 0 then
             return string.format("%s (avg n/a / min n/a / 1%% low n/a)", currentText)
         end
 
-        local avg = (stats.total or 0) / math.max(stats.samples or 1, 1)
-        local minFps = stats.min
-        local low1 = nil
-        if type(stats.bins) == "table" then
-            local worstCount = math.max(1, math.floor((stats.samples or 0) * 0.01 + 0.5))
-            local remaining = worstCount
-            local total = 0
-            for bucket = 0, 120 do
-                local count = tonumber(stats.bins[bucket + 1]) or 0
-                if count > 0 then
-                    local take = math.min(count, remaining)
-                    total = total + (bucket * take)
-                    remaining = remaining - take
-                    if remaining <= 0 then
-                        break
-                    end
-                end
-            end
-            if worstCount > 0 then
-                low1 = total / worstCount
-            end
-        end
-
+        -- Shared 1% low helper (same bins/samples shape as trace state).
+        local avg = (stats.fpsTotal or 0) / math.max(stats.fpsSamples, 1)
+        local minFps = stats.fpsMin
+        local low1 = self:GetTraceOnePercentLow(stats)
         local low1Text = type(low1) == "number" and string.format("%.1f", low1) or "n/a"
         if type(minFps) ~= "number" then
             return string.format("%s (avg %.1f / min n/a / 1%% low %s)", currentText, avg, low1Text)
@@ -152,20 +168,7 @@
         AddActionButton("Open Saved Fights Panel", string.format("Save and load fights across sessions (%d saved)", #self.saved.savedFights), function()
             self.dialogPanel = "saves"
         end)
-        AddActionButton("Previous Fight", "Cycle to previous fight in history", function()
-            self:StepFightView(-1)
-        end, function()
-            return #self.fightHistory == 0
-        end)
-        AddActionButton("Next Fight", "Cycle to next fight in history", function()
-            self:StepFightView(1)
-        end, function()
-            
-            return #self.fightHistory == 0
-        end)
-        AddActionButton("View Live Fight", "Return to current live fight view", function()
-            self.viewFightIndex = 0
-        end)
+        AddFightNavButtons()
 
         AddActionButton("Open Overview Panel", "General fight totals and timeline controls", function()
             self.dialogPanel = "overview"
@@ -246,19 +249,7 @@
             AddScrollableStatLine(overviewLines[i], "Overview statistic")
         end
 
-        AddActionButton("Previous Fight", "Cycle to previous fight in history", function()
-            self:StepFightView(-1)
-        end, function()
-            return #self.fightHistory == 0
-        end)
-        AddActionButton("Next Fight", "Cycle to next fight in history", function()
-            self:StepFightView(1)
-        end, function()
-            return #self.fightHistory == 0
-        end)
-        AddActionButton("View Live Fight", "Return to current live fight view", function()
-            self.viewFightIndex = 0
-        end)
+        AddFightNavButtons()
 
         AddBackButton()
         AddCloseButton()
@@ -574,25 +565,7 @@
             end
         end
 
-        dialog:AddSetting({ type = LibHarvensAddonSettings.ST_SECTION, label = "Top Healing Moments (30)" })
-        if not snapshot.topHealingMoments or #snapshot.topHealingMoments == 0 then
-            AddScrollableStatLine("No healing moments yet.", "No healing events in this fight")
-        else
-            for i = 1, math.min(30, #snapshot.topHealingMoments) do
-                local moment = snapshot.topHealingMoments[i]
-                AddScrollableStatLine(string.format("%d) %s", i, moment.label), moment.tooltip)
-            end
-        end
-
-        dialog:AddSetting({ type = LibHarvensAddonSettings.ST_SECTION, label = "Top Mitigation Moments (30)" })
-        if not snapshot.topMitigationMoments or #snapshot.topMitigationMoments == 0 then
-            AddScrollableStatLine("No mitigation moments yet.", "No blocked or shielded moments in this fight")
-        else
-            for i = 1, math.min(30, #snapshot.topMitigationMoments) do
-                local moment = snapshot.topMitigationMoments[i]
-                AddScrollableStatLine(string.format("%d) %s", i, moment.label), moment.tooltip)
-            end
-        end
+        AddHealingAndMitigationMoments(snapshot, "No blocked or shielded moments in this fight")
 
         AddBackButton()
         AddCloseButton()
@@ -1045,25 +1018,7 @@
             end
         end
 
-        dialog:AddSetting({ type = LibHarvensAddonSettings.ST_SECTION, label = "Top Healing Moments (30)" })
-        if not snapshot.topHealingMoments or #snapshot.topHealingMoments == 0 then
-            AddScrollableStatLine("No healing moments yet.", "No healing events in this fight")
-        else
-            for i = 1, math.min(30, #snapshot.topHealingMoments) do
-                local moment = snapshot.topHealingMoments[i]
-                AddScrollableStatLine(string.format("%d) %s", i, moment.label), moment.tooltip)
-            end
-        end
-
-        dialog:AddSetting({ type = LibHarvensAddonSettings.ST_SECTION, label = "Top Mitigation Moments (30)" })
-        if not snapshot.topMitigationMoments or #snapshot.topMitigationMoments == 0 then
-            AddScrollableStatLine("No mitigation moments yet.", "No mitigation events in this fight")
-        else
-            for i = 1, math.min(30, #snapshot.topMitigationMoments) do
-                local moment = snapshot.topMitigationMoments[i]
-                AddScrollableStatLine(string.format("%d) %s", i, moment.label), moment.tooltip)
-            end
-        end
+        AddHealingAndMitigationMoments(snapshot, "No mitigation events in this fight")
 
         AddBackButton()
         AddCloseButton()

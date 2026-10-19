@@ -2571,19 +2571,27 @@ local function BuildResourceSampleSummary(values)
             samples = 0,
             averagePct = 0,
             medianPct = 0,
+            minPct = 0,
+            maxPct = 0,
             hasData = false,
         }
     end
 
     local normalized = {}
+    local minPct, maxPct = math.huge, -math.huge
     for i = startIndex, #values do
-        normalized[#normalized + 1] = tonumber(values[i]) or 0
+        local v = tonumber(values[i]) or 0
+        normalized[#normalized + 1] = v
+        if v < minPct then minPct = v end
+        if v > maxPct then maxPct = v end
     end
 
     return {
         samples = #normalized,
         averagePct = Mean(normalized),
         medianPct = Median(normalized),
+        minPct = minPct,
+        maxPct = maxPct,
         hasData = true,
     }
 end

@@ -3,7 +3,7 @@
 ## Author: Vixen Hunny
 ## Version: 1.0.0
 ## AddOnVersion: 10000
-## APIVersion: 101047 101048
+## APIVersion: 101048 101050
 ## IsLibrary: true
 ## SavedVariables: LibFightsSV
 ## OptionalDependsOn: LibAddonMenu-2.0 LibHarvensAddonSettings LibSets

@@ -45,11 +45,12 @@ end
 local function LiveDialogRefreshKey(self)
     local fight = self.fight or {}
     return string.format(
-        "%s|%d|%d|%d",
+        "%s|%d|%d|%d|%s",
         tostring(self.dialogPanel or "main"),
         self.inCombat and 1 or 0,
         math.floor(tonumber(fight.snapshotRev) or 0),
-        self.viewFightIndex or 0
+        self.viewFightIndex or 0,
+        self:GetLibFightsRefreshKey()
     )
 end
 
@@ -166,6 +167,7 @@ function ConsoleMetrics:Initialize()
     self.fpsRuntime = { samples = 0, total = 0, min = nil, bins = {} }
     self.fight = NewFight(GetFrameTimeMilliseconds())
 
+    self:InitLibFightsIntegration()
     self:RegisterSettingsMenu()
     self:RegisterJournalIntegrationHooks()
 

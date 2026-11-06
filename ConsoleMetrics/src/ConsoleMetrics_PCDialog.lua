@@ -699,6 +699,9 @@ local function RenderMain(content, self)
     AddButton(content, "Resistance",  "Resistance, DR, and inferred protections",          function() self.dialogPanel = "resistance"end)
     AddButton(content, "Build",       "Action bars, gear, champion, and boon snapshot",    function() self.dialogPanel = "build"    end)
     AddButton(content, "Behavior",    "ML-lite model outputs and confidence",               function() self.dialogPanel = "behavior" end)
+    if self.LibFightsBridge.IsAvailable() then
+        AddButton(content, "LibFights", "Fight metrics and predictions from the LibFights library", function() self.dialogPanel = "libfights" end)
+    end
     AddButton(content, "Formulas",    "ESO stat math reference",                           function() self.dialogPanel = "formulas" end)
     AddButton(content, "Share",       "Send stats or build to chat",                       function() self.dialogPanel = "share"    end)
     AddButton(content, "Options",     "Toggles, clear fight data, and help",               function() self.dialogPanel = "options"  end)
@@ -1292,9 +1295,51 @@ local function RenderSaves(content, self)
 end
 
 -------------------------------------------------------------------------------
+-- LibFights panel
+-------------------------------------------------------------------------------
+local function RenderLibFights(content, self)
+    local bridge = self.LibFightsBridge
+    pcDlg.breadcrumb:SetText("LibFights")
+
+    local rows = self:BuildLibFightsRows()
+    for i = 1, #rows do
+        local row = rows[i]
+        if row.section then
+            AddSection(content, row.section)
+        else
+            AddStat(content, row.label, row.value or "", row.tooltip)
+        end
+    end
+
+    if bridge.IsAvailable() then
+        AddSection(content, "LibFights Controls")
+        if bridge.IsLogging() then
+            AddButton(content, "Stop LibFights Logging", "Stop_Logging(): end the current fight and unregister LibFights events",
+                function() self:StopLibFightsLogging() end)
+        else
+            AddButton(content, "Start LibFights Logging", "Start_Logging(): LibFights records nothing until this is called",
+                function()
+                    local ok, reason = self:StartLibFightsLogging()
+                    if not ok then
+                        self:Print("LibFights: " .. tostring(reason))
+                    end
+                end)
+        end
+        AddButton(content, "Previous LibFights Fight", "Show the LibFights fight before this one",
+            function() self:StepLibFightsView(-1) end)
+        AddButton(content, "Next LibFights Fight", "Show the next LibFights fight (towards the live one)",
+            function() self:StepLibFightsView(1) end)
+        AddButton(content, "Print LibFights Report", "Print the full LibFights report for this fight to chat",
+            function() self:PrintLibFightsLines("all") end)
+    end
+    AddBackButton(content, self)
+end
+
+-------------------------------------------------------------------------------
 -- Router: pick and render the correct panel
 -------------------------------------------------------------------------------
 local PANELS = {
+    libfights   = RenderLibFights,
     main        = RenderMain,
     overview    = RenderOverview,
     skills      = RenderSkills,

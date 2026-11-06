@@ -45,6 +45,7 @@ local HELP_LINES = {
     "/cm addset <label>|<scene>|<abilityId>|<abilityName> - Add a custom set matcher.",
     "/cm clearsets - Remove all custom set rules.",
     "/cm inject - Retry Journal menu/keybind integration.",
+    "/cm lf [status|start|stop|view|print|all|models|next|prev|auto on|off] - LibFights library controls (needs LibFights).",
     "/cm reset - Reset addon options to defaults (keeps saved fights and set rules).",
 }
 
@@ -342,6 +343,61 @@ local function LoadSavesCommand(self)
     end
 end
 
+local function LibFightsCommand(self, _, restLower)
+    local bridge = self.LibFightsBridge
+    local sub, arg = string.match(restLower or "", "^(%S*)%s*(.*)$")
+    sub = sub or ""
+
+    if sub == "auto" then
+        local flag = ParseOnOff(arg)
+        if flag == nil then
+            self:Print("Usage: /cm lf auto on|off")
+            return
+        end
+        self:SetLibFightsAutoStart(flag)
+        self:Print(flag and "LibFights logging will start automatically." or "LibFights auto start disabled.")
+        return
+    end
+
+    if not bridge.IsAvailable() then
+        self:Print("LibFights is not installed. Copy the LibFights folder into your AddOns directory.")
+        return
+    end
+
+    if sub == "" or sub == "status" then
+        local _, index, count = self:GetLibFightsViewedFight()
+        self:Print(string.format("LibFights %s: %s, auto start %s, %d fight(s) in memory, viewing %d.",
+            tostring(LibFights.version or ""),
+            bridge.IsLogging() and "logging" or "stopped",
+            self.saved.libFightsAutoStart and "on" or "off",
+            count, index))
+    elseif sub == "start" then
+        local ok, reason = self:StartLibFightsLogging()
+        if not ok then
+            self:Print("LibFights: " .. tostring(reason))
+        end
+    elseif sub == "stop" then
+        local ok, reason = self:StopLibFightsLogging()
+        if not ok then
+            self:Print("LibFights: " .. tostring(reason))
+        end
+    elseif sub == "view" or sub == "panel" then
+        self.dialogPanel = "libfights"
+        self:OpenFightViewDialog()
+    elseif sub == "print" or sub == "last" then
+        self:PrintLibFightsLines("summary")
+    elseif sub == "all" then
+        self:PrintLibFightsLines("all")
+    elseif sub == "models" then
+        self:PrintLibFightsLines("models")
+    elseif sub == "next" or sub == "prev" then
+        self:StepLibFightsView(sub == "next" and 1 or -1)
+        self:PrintLibFightsLines("summary")
+    else
+        self:Print("Usage: /cm lf [status|start|stop|view|print|all|models|next|prev|auto on|off]")
+    end
+end
+
 local function AddSetCommand(self, rest)
     if rest == "" then
         self:Print("Usage: /cm addset <label>|<scene>|<abilityId>|<abilityName>")
@@ -365,6 +421,7 @@ end
 
 Register(function(self) self:PrintHelp() end, "", "help", "options")
 Register(function(self) self:RefreshJournalIntegration(true) end, "inject", "journal")
+Register(LibFightsCommand, "lf", "libfights")
 Register(function(self)
     self.dialogPanel = "main"
     self:OpenFightViewDialog()

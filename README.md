@@ -16,6 +16,7 @@ Based on the addon source in this repository:
 - Chat sharing of results (skills and gear are sent as clickable ESO links).
 - A Journal menu entry for opening the viewer (injected on load; `/cm inject` re-applies it).
 - A "Performance Mode" preset intended for lower-memory consoles such as the Series S.
+- Optional **LibFights** integration: when the bundled `LibFights` library is installed, Console Metrics starts its logging and adds a LibFights panel (fight metrics, top abilities, crit/DR/resistance/TTK predictions) to both viewers.
 - Optional debugging tools (live trace, build snapshot, set dump). These are heavy and meant for short debugging sessions only.
 
 ## Installation
@@ -26,8 +27,9 @@ The addon lives in the `ConsoleMetrics/` folder (manifest: `ConsoleMetrics/Conso
 2. Copy the inner `ConsoleMetrics/` folder (the one containing `ConsoleMetrics.addon` and `src/`) into your ESO `AddOns` directory.
    - PC: typically `Documents/Elder Scrolls Online/live/AddOns/`.
    - Console: the platform-specific method for loading custom addons is **not documented here** and is not determined by this repository.
-3. Install the optional dependencies listed in the manifest if you need them: `LibConsoleDialogs` and `LibHarvensAddonSettings` (needed for the console viewer, `/cm view` reports an error without them), `LibAddonMenu-2.0`, `LMB`, `PvPCooldownTracker`.
-4. Enable the addon in the in-game Add-Ons menu and reload the UI.
+3. Optional: also copy the `LibFights/` folder from this repository into the same `AddOns` directory to enable the LibFights panel and `/cm lf` commands.
+4. Install the optional dependencies listed in the manifest if you need them: `LibConsoleDialogs` and `LibHarvensAddonSettings` (needed for the console viewer, `/cm view` reports an error without them), `LibAddonMenu-2.0`, `LMB`, `PvPCooldownTracker`, `LibFights`.
+5. Enable the addon in the in-game Add-Ons menu and reload the UI.
 
 ## Usage
 
@@ -44,9 +46,21 @@ Once loaded, the addon prints a message in chat. Use `/cm` or `/consolemetrics`:
 | `/cm autohide on\|off` | Auto-hide the dialog |
 | `/cm perf on\|off\|status` | Performance Mode (applies a Series S preset) |
 | `/cm inject` (or `journal`) | Re-apply the Journal menu entry |
+| `/cm lf [status\|start\|stop\|view\|print\|all\|models\|next\|prev]` | LibFights controls: logging, open the LibFights panel, print reports and model predictions, browse LibFights fights |
+| `/cm lf auto on\|off` | Start LibFights logging automatically on load (default on) |
 | `/cm dumpsets`, `/cm debugbuild`, `/cm trace ...` | Debugging; trace output is heavy and can hurt performance |
 
 Run `/cm help` in game for the authoritative, current list of commands.
+
+## LibFights
+
+[`LibFights/`](LibFights/README.md) is a separate library addon in this repository. It logs nothing until `Start_Logging()` is called. When it is installed, Console Metrics:
+
+- starts LibFights logging on load (turn this off with `/cm lf auto off` or the "Start LibFights Logging" setting) and only stops a session it started itself;
+- passes lighter options (no raw event log, no target effect tracking, 2s stat sampling) while Performance Mode is on, and restarts its session when Performance Mode changes;
+- adds a **LibFights** panel to the console and PC viewers with the fight summary, top damage abilities and the library's predictions, plus start/stop, fight browsing and "print report" buttons.
+
+Console Metrics' own fight tracking is unchanged and works the same without LibFights. Running both loggers costs extra CPU and memory, so on Series S consider Performance Mode or `/cm lf auto off`.
 
 ## Known limitations / compatibility
 

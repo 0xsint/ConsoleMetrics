@@ -41,6 +41,7 @@ local OPTION_SCHEMA = {
     { key = "saveFightDraftName",          kind = "string" },
     { key = "loadFightDraftName",          kind = "string" },
     { key = "maxSavedFights",              kind = "integer", min = 1,    max = 50 },
+    { key = "libFightsAutoStart",          kind = "boolean" },
 }
 
 local function NormalizeOption(self, entry, value)
@@ -158,9 +159,14 @@ function ConsoleMetrics:SetPerformanceMode(enabled)
     if not self.saved then
         return
     end
+    local changed = (self.saved.performanceMode == true) ~= (enabled == true)
     self.saved.performanceMode = enabled == true
     if enabled then
         self:ApplyConsolePerformancePreset()
+    end
+    if changed then
+        -- LibFights reads its options at Start_Logging(), so restart it to apply the preset.
+        self:RestartLibFightsLogging()
     end
 end
 
@@ -324,6 +330,21 @@ function ConsoleMetrics:RegisterSettingsMenu()
         disable = function() return not self.saved.behaviorModelEnabled end,
     })
 
+    -- LibFights
+    panel:AddSetting({
+        type = LibHarvensAddonSettings.ST_SECTION,
+        label = "LibFights",
+    })
+    panel:AddSetting({
+        type = LibHarvensAddonSettings.ST_CHECKBOX,
+        label = "Start LibFights Logging",
+        tooltip = "When the LibFights library is installed, start its logging on load so the LibFights panel has data. Turning this off stops a session Console Metrics started.",
+        getFunction = function() return self.saved.libFightsAutoStart end,
+        setFunction = function(v) self:SetLibFightsAutoStart(v) end,
+        default = self.defaults.libFightsAutoStart,
+        disable = function() return not self.LibFightsBridge.IsAvailable() end,
+    })
+
     -- Actions
     panel:AddSetting({
         type = LibHarvensAddonSettings.ST_SECTION,
@@ -335,8 +356,7 @@ function ConsoleMetrics:RegisterSettingsMenu()
         tooltip = "Apply the low-memory / high-performance preset (same as /cm perf on).",
         buttonText = "Apply",
         clickHandler = function()
-            self.saved.performanceMode = true
-            self:ApplyConsolePerformancePreset()
+            self:SetPerformanceMode(true)
             self:Print("Performance preset applied.")
         end,
     })

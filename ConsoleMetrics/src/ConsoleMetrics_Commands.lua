@@ -15,6 +15,7 @@ local HELP_LINES = {
     "Commands:",
     "/cm view - Open the Console Metrics dialog.",
     "/cm close - Close the dialog immediately.",
+    "/cm settings - Open the settings panel (LibAddonMenu-2.0 on PC, LibHarvensAddonSettings otherwise).",
     "/cm prev - View the previous fight in history.",
     "/cm next - View the next fight in history.",
     "/cm clear - Clear live fight data and all history.",
@@ -427,6 +428,7 @@ Register(function(self)
     self:OpenFightViewDialog()
 end, "view", "menu")
 Register(function(self) self:CloseFightViewDialog(false, "slash") end, "close")
+Register(function(self) self:OpenSettingsMenu() end, "settings", "config")
 Register(function(self) StepCommand(self, 1) end, "next")
 Register(function(self) StepCommand(self, -1) end, "prev")
 Register(function(self)

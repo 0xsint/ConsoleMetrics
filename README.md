@@ -14,6 +14,7 @@ Based on the addon source in this repository:
   - PC (keyboard/mouse): a scrollable window.
 - Browse previous fights (`/cm next`, `/cm prev`) and clear history (`/cm clear`).
 - Chat sharing of results (skills and gear are sent as clickable ESO links).
+- A settings menu: LibAddonMenu-2.0 on PC when it is installed, otherwise LibHarvensAddonSettings (always on console). `/cm settings` opens it.
 - A Journal menu entry for opening the viewer (injected on load; `/cm inject` re-applies it).
 - A "Performance Mode" preset intended for lower-memory consoles such as the Series S.
 - Optional **LibFights** integration: when the bundled `LibFights` library is installed, Console Metrics starts its logging and adds a LibFights panel (fight metrics, top abilities, crit/DR/resistance/TTK predictions) to both viewers.
@@ -28,7 +29,7 @@ The addon lives in the `ConsoleMetrics/` folder (manifest: `ConsoleMetrics/Conso
    - PC: typically `Documents/Elder Scrolls Online/live/AddOns/`.
    - Console: the platform-specific method for loading custom addons is **not documented here** and is not determined by this repository.
 3. Optional: also copy the `LibFights/` folder from this repository into the same `AddOns` directory to enable the LibFights panel and `/cm lf` commands.
-4. Install the optional dependencies listed in the manifest if you need them: `LibConsoleDialogs` and `LibHarvensAddonSettings` (needed for the console viewer, `/cm view` reports an error without them), `LibAddonMenu-2.0`, `LMB`, `PvPCooldownTracker`, `LibFights`.
+4. Install the optional dependencies listed in the manifest if you need them: `LibConsoleDialogs` and `LibHarvensAddonSettings` (needed for the console viewer, `/cm view` reports an error without them), `LibAddonMenu-2.0` (PC settings panel), `LMB`, `PvPCooldownTracker`, `LibFights`.
 5. Enable the addon in the in-game Add-Ons menu and reload the UI.
 
 ## Usage
@@ -40,6 +41,7 @@ Once loaded, the addon prints a message in chat. Use `/cm` or `/consolemetrics`:
 | `/cm` or `/cm help` | Show help |
 | `/cm view` (or `menu`) | Open the fight viewer |
 | `/cm close` | Close the viewer |
+| `/cm settings` | Open the settings panel (opens straight to it with LibAddonMenu-2.0) |
 | `/cm next` / `/cm prev` | Step through fight history |
 | `/cm clear` | Clear fight history and live data |
 | `/cm autoclear on\|off` | Clear data automatically on the next fight |
